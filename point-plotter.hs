@@ -14,6 +14,14 @@ import System.Random
 import Control.Monad (replicateM)
 import Graphics.Blank
 
+-- Define a seed for generation of
+-- pseudo-random (x,y) coordinates
+seed = 8::Int
+
+-- Define how many points will be plotted on the graph
+numberOfPoints = 10::Int
+
+
 -- Represent polynomials as tuples
 -- of coefficients and exponents
 type PolyTerm = (Float, Int)
@@ -34,8 +42,8 @@ main = blankCanvas 3000 { middleware = [] } $ \ context -> do
                                                         -- behaves like Cartesian plot
     drawGraphBackground
 
-    coords <- getCoords
-    plotPoints
+    let coords = getPureCoords
+    plotPoints coords
 
     drawGraphBorder
 
@@ -68,14 +76,31 @@ readTermsMaybe str = readMaybe str
 -- Define the range of points
 -- viewable in the graph plot
 graphRange :: (Double, Double)
-graphRange = (-500, 500)
+graphRange = (-300, 300)
+
+
+getPureRandoms :: StdGen -> [Double]
+getPureRandoms gen =
+    take numberOfPoints $ randomRs graphRange gen
+
+getPureCoords =
+    let g           = mkStdGen seed
+        (ga, gb)    = split g
+        xs          = getPureRandoms ga
+        ys          = getPureRandoms gb
+    in zip xs ys
+
+
+
+
+
+{- ##############################
+ - RANDOM, IMPURE IO COORDINATES
+ ############################## -}
 
 -- Get a single random int within range
 getRandomInRange :: IO Double
 getRandomInRange = getStdRandom $ randomR graphRange
-
--- Define how many points will be plotted on the graph
-numberOfPoints = 10::Int
 
 -- Zip lists of random Ints to make random coordinates
 getCoords :: IO [(Double, Double)]
@@ -86,19 +111,22 @@ getCoords = do
     ys <- replicateM numberOfPoints getRandomInRange    -- ys::[Double]
     return $ zip xs ys
 
+{- ######################### -}
+
+
+
+
 
 plotPoints :: [(Double,Double)] -> Canvas ()
 plotPoints pts = do
-    list <- pts
-    -- sequence_ $ fmap plotPoint pts
-    sequence_ $ fmap plotPoint list
+    sequence_ $ fmap plotPoint pts
 
 
 plotPoint :: (Double, Double) -> Canvas ()
 plotPoint (x,y) = do
     beginPath()
     arc(x, y, 1, 0, 2*pi, False)
-    lineWidth 4
+    lineWidth 5
     strokeStyle "blue"
     fillStyle "blue"
     fill()
