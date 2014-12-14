@@ -8,6 +8,7 @@ module Main where
 import Data.Maybe
 import Text.Read -- for readMaybe function
 import System.IO -- for hFlush function
+import System.Random
 
 -- Represent polynomials as tuples
 -- of coefficients and exponents
@@ -23,10 +24,9 @@ data Expr = GThan [PolyTerm] | LThan [PolyTerm] deriving Show
 -- successfully parsed
 main :: IO ()
 main = do
-    inp <- promptForExpr
-    case parseExpr inp of
-        Nothing -> print "NOTHING!"
-        Just e -> print e
+    x <- getRandomInRange
+    y <- getRandomInRange
+    print (x,y)
 
 
 -- From HaskellWiki: Intro to Haskell IO Actions
@@ -51,4 +51,15 @@ parseExpr (a:b:terms) = case readTermsMaybe terms of
 
 readTermsMaybe :: String -> Maybe [PolyTerm]
 readTermsMaybe str = readMaybe str
+
+
+
+-- Define the range of points
+-- viewable in the graph plot
+graphRange :: (Int, Int)
+graphRange = (-500, 500)
+
+-- Get a single random int within range
+getRandomInRange :: IO Int
+getRandomInRange = getStdRandom $ randomR graphRange
 
