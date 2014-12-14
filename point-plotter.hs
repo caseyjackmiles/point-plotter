@@ -3,6 +3,8 @@
 -- Dec. 12, 2014
 ----------------
 
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main where
 
 import Data.Maybe
@@ -10,6 +12,7 @@ import Text.Read -- for readMaybe function
 import System.IO -- for hFlush function
 import System.Random
 import Control.Monad (replicateM)
+import Graphics.Blank
 
 -- Represent polynomials as tuples
 -- of coefficients and exponents
@@ -24,7 +27,10 @@ data Expr = GThan [PolyTerm] | LThan [PolyTerm] deriving Show
 -- Prompt for expression input, print out if
 -- successfully parsed
 main :: IO ()
-main = return ()
+main = blankCanvas 3000 { middleware = [] } $ \ context -> do
+    send context $ do
+    setUpCanvas context
+
 
 
 -- From HaskellWiki: Intro to Haskell IO Actions
@@ -72,4 +78,15 @@ getCoords = do
     xs <- replicateM numberOfPoints getRandomInRange    -- xs::[Int] 
     ys <- replicateM numberOfPoints getRandomInRange    -- ys::[Int] 
     return $ zip xs ys
+
+
+
+setUpCanvas :: DeviceContext -> Canvas ()
+setUpCanvas context = do
+    translate ( width context / 2, height context / 2 )
+    scale (1, -1) -- invert y-scale so canvas behaves like Cartesian plot
+    rect(-300, -300, 600, 600)
+    lineWidth 5
+    strokeStyle "#333333"
+    stroke()
 
