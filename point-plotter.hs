@@ -29,8 +29,14 @@ data Expr = GThan [PolyTerm] | LThan [PolyTerm] deriving Show
 main :: IO ()
 main = blankCanvas 3000 { middleware = [] } $ \ context -> do
     send context $ do
-    setUpCanvas context
-
+    translate ( width context / 2, height context / 2 ) -- center plot on screen
+    scale (1, -1)                                       -- invert y-scale so canvas
+                                                        -- behaves like Cartesian plot
+    drawGraphBackground
+    {------------------------
+     <plotting function here>
+     ------------------------}
+    drawGraphBorder
 
 
 -- From HaskellWiki: Intro to Haskell IO Actions
@@ -81,16 +87,14 @@ getCoords = do
 
 
 
-setUpCanvas :: DeviceContext -> Canvas ()
-setUpCanvas context = do
-    translate ( width context / 2, height context / 2 )
-    scale (1, -1) -- invert y-scale so canvas behaves like Cartesian plot
+drawGraphBorder :: Canvas ()
+drawGraphBorder = do
+    beginPath()
     rect(-300, -300, 600, 600)
     lineWidth 5
+    lineJoin "miter"
     strokeStyle "#333333"
     stroke()
-    drawVerticalLines
-
 
 drawVerticalLines :: Canvas ()
 drawVerticalLines = do
@@ -103,3 +107,13 @@ drawVerticalLines = do
     strokeStyle "#bdbdbd"
     stroke()
 
+drawHorizontalLines :: Canvas ()
+drawHorizontalLines = do
+    let coordPairs = [ (x, y) | y <- [-250,-200..250], x <- [300, -300] ]
+    let commands = zipWith (\ cmd coord -> cmd coord) (cycle [moveTo, lineTo]) coordPairs
+    sequence_ commands
+    lineWidth 0.5
+    strokeStyle "#bdbd99"
+    stroke()
+
+drawGraphBackground = drawVerticalLines >> drawHorizontalLines
