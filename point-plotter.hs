@@ -89,4 +89,17 @@ setUpCanvas context = do
     lineWidth 5
     strokeStyle "#333333"
     stroke()
+    drawVerticalLines
+
+
+drawVerticalLines :: Canvas ()
+drawVerticalLines = do
+    let coordPairs = [ (x,y) | x <- [-250,-200..250], y <- [300,-300] ]
+    -- Build list of canvas commands
+    let commands = zipWith (\ cmd coord -> cmd coord) (cycle [moveTo, lineTo]) coordPairs
+    -- Now perform the actions
+    sequence_ commands
+    lineWidth 0.5
+    strokeStyle "#bdbdbd"
+    stroke()
 
