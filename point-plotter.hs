@@ -33,9 +33,10 @@ main = blankCanvas 3000 { middleware = [] } $ \ context -> do
     scale (1, -1)                                       -- invert y-scale so canvas
                                                         -- behaves like Cartesian plot
     drawGraphBackground
-    {------------------------
-     <plotting function here>
-     ------------------------}
+
+    coords <- getCoords
+    plotPoints
+
     drawGraphBorder
 
 
@@ -66,24 +67,43 @@ readTermsMaybe str = readMaybe str
 
 -- Define the range of points
 -- viewable in the graph plot
-graphRange :: (Int, Int)
+graphRange :: (Double, Double)
 graphRange = (-500, 500)
 
 -- Get a single random int within range
-getRandomInRange :: IO Int
+getRandomInRange :: IO Double
 getRandomInRange = getStdRandom $ randomR graphRange
 
 -- Define how many points will be plotted on the graph
 numberOfPoints = 10::Int
 
 -- Zip lists of random Ints to make random coordinates
-getCoords :: IO [(Int, Int)]
+getCoords :: IO [(Double, Double)]
 getCoords = do
     -- replicateM :: Monad m => Int -> m a -> m [a]
     -- repeats a monadic action n times, creates list
-    xs <- replicateM numberOfPoints getRandomInRange    -- xs::[Int] 
-    ys <- replicateM numberOfPoints getRandomInRange    -- ys::[Int] 
+    xs <- replicateM numberOfPoints getRandomInRange    -- xs::[Double]
+    ys <- replicateM numberOfPoints getRandomInRange    -- ys::[Double]
     return $ zip xs ys
+
+
+plotPoints :: [(Double,Double)] -> Canvas ()
+plotPoints pts = do
+    list <- pts
+    -- sequence_ $ fmap plotPoint pts
+    sequence_ $ fmap plotPoint list
+
+
+plotPoint :: (Double, Double) -> Canvas ()
+plotPoint (x,y) = do
+    beginPath()
+    arc(x, y, 1, 0, 2*pi, False)
+    lineWidth 4
+    strokeStyle "blue"
+    fillStyle "blue"
+    fill()
+    stroke()
+    closePath()
 
 
 
