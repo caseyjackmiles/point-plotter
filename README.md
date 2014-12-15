@@ -10,7 +10,7 @@ a rough to-do list
 - [x] Plot chart setup function
 - [ ] Function to complete box after function to be filled in
 - [x] Generate random numbers within range
-- [ ] Function to plot random points on graph
+- [x] Function to plot random points on graph
 - [ ] Function to change color of dot if within plot
 - [ ] Function to check status of MVar for user input
 - [x] Data types for simple-parse polynomial expressions
