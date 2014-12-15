@@ -24,7 +24,7 @@ numberOfPoints = 10::Int
 
 -- Represent polynomials as tuples
 -- of coefficients and exponents
-type PolyTerm = (Float, Int)
+type PolyTerm = (Double, Int)
 
 -- Expressions are <= or >= with
 -- a polynomial
@@ -44,6 +44,9 @@ main = blankCanvas 3000 { middleware = [] } $ \ context -> do
 
     let coords = getPureCoords
     plotPoints coords
+
+    let expr = (GThan [(0.001,2)])
+    plotExpr (evalExpr expr)
 
     drawGraphBorder
 
@@ -165,3 +168,25 @@ drawHorizontalLines = do
     stroke()
 
 drawGraphBackground = drawVerticalLines >> drawHorizontalLines
+
+
+
+
+
+-- Create a function from x -> y
+evalExpr :: Expr -> (Double -> Double)
+evalExpr (GThan terms) =
+    (\x -> sum $ map (\f -> f x) evalTerms)
+        where evalTerms = [ (\x -> c*(x^e)) | (c,e) <- terms ]  -- c = coefficient, e = exponent
+evalExpr (LThan terms) = evalExpr (GThan terms)
+
+plotExpr :: (Double -> Double) -> Canvas ()
+plotExpr f = do
+    let coords = [ (x, (f x)) | x <- [(fst graphRange)..(snd graphRange)] ]
+    beginPath()
+    moveTo (coords !! 0)
+    sequence_ $ map lineTo coords
+    lineWidth 4
+    strokeStyle "gold"
+    stroke()
+
