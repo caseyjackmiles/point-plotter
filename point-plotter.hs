@@ -10,17 +10,20 @@ module Main where
 import Data.Maybe
 import Text.Read -- for readMaybe function
 import System.IO -- for hFlush function
+import Data.Text(Text)
 import System.Random
 import Control.Monad (replicateM)
+import Control.Concurrent
+import qualified Data.Map as Map
 import Graphics.Blank
 
 -- Color values for strokes and fills
-color1     = "rgba(255,215,0,1)"
-color1fill = "rgba(255,215,0,0.3)"
-color2     = "rgba(32,178,70,1)"
-color2fill = "rgba(32,178,70,0.3)"
-color3     = "rgba(178,32,40,1)"
-color3fill = "rgba(178,32,40,0.3)"
+strokeColor1 = "rgba(255,215,0,1)"
+fillColor1   = "rgba(255,215,0,0.3)"
+strokeColor2 = "rgba(32,178,70,1)"
+fillColor2   = "rgba(32,178,70,0.3)"
+strokeColor3 = "rgba(178,32,40,1)"
+fillColor3   = "rgba(178,32,40,0.3)"
 
 
 -- Define a seed for generation of
@@ -39,25 +42,57 @@ type PolyTerm = (Double, Int)
 -- a polynomial
 data Expr = GThan [PolyTerm] | LThan [PolyTerm] deriving Show
 
+type Color = Text
+
+-- Players can be represented by colors!
+data Player = Player1 Color Color | Player2 Color Color deriving (Show, Eq, Ord)
+
+player1,player2 :: Player
+player1 = Player1 strokeColor1 fillColor1
+player2 = Player2 strokeColor2 fillColor2
+
 
 
 -- Prompt for expression input, print out if
 -- successfully parsed
 main :: IO ()
-main = blankCanvas 3000 { middleware = [] } $ \ context -> do
-    send context $ do
-    translate ( width context / 2, height context / 2 ) -- center plot on screen
-    scale (1, -1)                                       -- invert y-scale so canvas
-                                                        -- behaves like Cartesian plot
-    drawGraphBackground
+main = do
+    randCoords <- getCoords      -- random generation
+    let coords = getPureCoords  -- deterministic, with seed
 
-    let coords = getPureCoords
-    plotPoints coords
+    p1MVar <- newEmptyMVar
 
-    let expr = (GThan [(0.00001,3)])
-    fillExpr expr
+    -- Fork a thread for user to be able to input expr
+    forkIO (playerActionLoop "PLAYER 1" p1MVar)
 
-    drawGraphBorder
+    blankCanvas 3000 { middleware = [] } $ \ context -> do
+        send context $ do
+            translate (width context/2, height context/2)   -- center plot on screen
+            scale (1, -1)                                   -- invert y-scale so canvas
+                                                            -- behaves like Cartesian plot
+            drawGraphBackground
+            plotPoints coords
+            drawGraphBorder
+
+        p1expr <- takeMVar p1MVar                       -- blocks until p1 has expr'd
+        let exprMap = Map.singleton player1 p1expr      -- create map of player expressions
+
+        send context $ do
+            plotPoints randCoords
+            drawGraphBorder
+
+
+playerActionLoop :: String -> MVar Expr -> IO ()
+playerActionLoop name var = do
+    putStrLn $ name ++ " ------------------------------------------------"
+    input <- promptForExpr
+    case parseExpr input of
+        Just expr -> do
+            putStrLn "Successful parse"
+            putMVar var expr
+        Nothing -> do
+            putStrLn "Unsuccessful parse\n"
+            playerActionLoop name var
 
 
 -- From HaskellWiki: Intro to Haskell IO Actions
@@ -67,7 +102,7 @@ promptLine prompt = putStr prompt >> hFlush stdout >> getLine
 -- Specialize prompt for equation input
 promptForExpr :: IO String
 promptForExpr = 
-    promptLine "\nEnter comparison operator and [(Coefficient, Exponent)] values\ny "
+    promptLine "Enter comparison operator and [(Coefficient, Exponent)] values\ny "
 
 
 -- Easy parsing of expression
@@ -204,14 +239,14 @@ fillExpr e = do
     case e of
         GThan terms -> do lineTo (300,300)
                           lineTo (-300,300)
-                          fillStyle color1fill
+                          fillStyle fillColor1
                           fill()
         LThan terms -> do lineTo (300,-300)
                           lineTo (-300,-300)
-                          fillStyle color1fill
+                          fillStyle fillColor1
                           fill()
     lineWidth 4
-    strokeStyle color1
+    strokeStyle strokeColor1
     stroke()
     closePath()
 
