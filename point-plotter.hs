@@ -14,6 +14,15 @@ import System.Random
 import Control.Monad (replicateM)
 import Graphics.Blank
 
+-- Color values for strokes and fills
+color1     = "rgba(255,215,0,1)"
+color1fill = "rgba(255,215,0,0.3)"
+color2     = "rgba(32,178,70,1)"
+color2fill = "rgba(32,178,70,0.3)"
+color3     = "rgba(178,32,40,1)"
+color3fill = "rgba(178,32,40,0.3)"
+
+
 -- Define a seed for generation of
 -- pseudo-random (x,y) coordinates
 seed = 8::Int
@@ -45,8 +54,8 @@ main = blankCanvas 3000 { middleware = [] } $ \ context -> do
     let coords = getPureCoords
     plotPoints coords
 
-    let expr = (GThan [(0.001,2)])
-    plotExpr (evalExpr expr)
+    let expr = (GThan [(0.00001,3)])
+    fillExpr expr
 
     drawGraphBorder
 
@@ -130,8 +139,8 @@ plotPoint (x,y) = do
     beginPath()
     arc(x, y, 1, 0, 2*pi, False)
     lineWidth 5
-    strokeStyle "blue"
-    fillStyle "blue"
+    strokeStyle "black"
+    fillStyle "black"
     fill()
     stroke()
     closePath()
@@ -177,16 +186,39 @@ drawGraphBackground = drawVerticalLines >> drawHorizontalLines
 evalExpr :: Expr -> (Double -> Double)
 evalExpr (GThan terms) =
     (\x -> sum $ map (\f -> f x) evalTerms)
-        where evalTerms = [ (\x -> c*(x^e)) | (c,e) <- terms ]  -- c = coefficient, e = exponent
+        where evalTerms = [ (\x -> c*(x^e)) | (c,e) <- terms ]  -- c=coeff, e=expo
 evalExpr (LThan terms) = evalExpr (GThan terms)
 
 plotExpr :: (Double -> Double) -> Canvas ()
 plotExpr f = do
-    let coords = [ (x, (f x)) | x <- [(fst graphRange)..(snd graphRange)] ]
-    beginPath()
+    let range = [(fst graphRange)..(snd graphRange)]
+    let coords = [ (x, (boundToGraph $ f x)) | x <- range ]
     moveTo (coords !! 0)
     sequence_ $ map lineTo coords
-    lineWidth 4
-    strokeStyle "gold"
-    stroke()
 
+fillExpr :: Expr -> Canvas ()
+fillExpr e = do
+    let fn = evalExpr e
+    beginPath()
+    plotExpr fn -- plot actual function
+    case e of
+        GThan terms -> do lineTo (300,300)
+                          lineTo (-300,300)
+                          fillStyle color1fill
+                          fill()
+        LThan terms -> do lineTo (300,-300)
+                          lineTo (-300,-300)
+                          fillStyle color1fill
+                          fill()
+    lineWidth 4
+    strokeStyle color1
+    stroke()
+    closePath()
+
+
+
+bounded :: (Double, Double) -> (Double -> Double)
+bounded (low, high) = (\val -> min high $ max low val)
+
+boundToGraph :: (Double -> Double)
+boundToGraph = bounded graphRange
