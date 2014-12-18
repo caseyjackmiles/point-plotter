@@ -51,6 +51,9 @@ player1,player2 :: Player
 player1 = Player1 strokeColor1 fillColor1
 player2 = Player2 strokeColor2 fillColor2
 
+exprMap :: Map.Map Player Expr
+exprMap = Map.empty
+
 
 
 -- Prompt for expression input, print out if
@@ -65,20 +68,21 @@ main = do
     -- Fork a thread for user to be able to input expr
     forkIO (playerActionLoop "PLAYER 1" p1MVar)
 
+    ------------------------------------------------------
     blankCanvas 3000 { middleware = [] } $ \ context -> do
         send context $ do
             translate (width context/2, height context/2)   -- center plot on screen
             scale (1, -1)                                   -- invert y-scale so canvas
                                                             -- behaves like Cartesian plot
             drawGraphBackground
-            plotPoints coords
+            plotPoints randCoords
             drawGraphBorder
 
         p1expr <- takeMVar p1MVar                       -- blocks until p1 has expr'd
-        let exprMap = Map.singleton player1 p1expr      -- create map of player expressions
 
         send context $ do
-            plotPoints randCoords
+            --fillExpr player1
+            displayPlayerMove player1 p1expr
             drawGraphBorder
 
 
@@ -231,22 +235,27 @@ plotExpr f = do
     moveTo (coords !! 0)
     sequence_ $ map lineTo coords
 
-fillExpr :: Expr -> Canvas ()
-fillExpr e = do
-    let fn = evalExpr e
+
+displayPlayerMove :: Player -> Expr -> Canvas ()
+displayPlayerMove (Player1 sc fc) e = fillExpr e sc fc
+displayPlayerMove (Player2 sc fc) e = fillExpr e sc fc
+
+fillExpr :: Expr -> Color -> Color -> Canvas ()
+fillExpr expr sc fc = do
+    let fn = evalExpr expr
     beginPath()
     plotExpr fn -- plot actual function
-    case e of
+    case expr of
         GThan terms -> do lineTo (300,300)
                           lineTo (-300,300)
-                          fillStyle fillColor1
+                          fillStyle fc
                           fill()
         LThan terms -> do lineTo (300,-300)
                           lineTo (-300,-300)
-                          fillStyle fillColor1
+                          fillStyle fc
                           fill()
     lineWidth 4
-    strokeStyle strokeColor1
+    strokeStyle sc
     stroke()
     closePath()
 
