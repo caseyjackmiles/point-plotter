@@ -19,11 +19,11 @@ import Graphics.Blank
 
 -- Color values for strokes and fills
 strokeColor1 = "rgba(255,215,0,1)"
-fillColor1   = "rgba(255,215,0,0.3)"
+fillColor1   = "rgba(255,215,0,0.1)"
 strokeColor2 = "rgba(32,178,70,1)"
-fillColor2   = "rgba(32,178,70,0.3)"
+fillColor2   = "rgba(32,178,70,0.1)"
 strokeColor3 = "rgba(178,32,40,1)"
-fillColor3   = "rgba(178,32,40,0.3)"
+fillColor3   = "rgba(178,32,40,0.1)"
 
 
 -- Define a seed for generation of
@@ -57,9 +57,11 @@ main = do
     let coords = getPureCoords  -- deterministic, with seed
 
     p1MVar <- newEmptyMVar
+    p2MVar <- newEmptyMVar
 
     -- Fork a thread for user to be able to input expr
     forkIO (playerActionLoop "PLAYER 1" p1MVar)
+    --forkIO (playerActionLoop "PLAYER 2" p2MVar)
 
     ------------------------------------------------------
     blankCanvas 3000 { middleware = [] } $ \ context -> do
@@ -68,14 +70,22 @@ main = do
             scale (1, -1)                                   -- invert y-scale so canvas
                                                             -- behaves like Cartesian plot
             drawGraphBackground
-            plotPoints randCoords
+            plotPoints randCoords "black"
             drawGraphBorder
 
         p1expr <- takeMVar p1MVar                       -- blocks until p1 has expr'd
         let player1 = Player p1expr strokeColor1 fillColor1
 
+        forkIO (playerActionLoop "PLAYER 2" p2MVar)
+
+        p2expr <- takeMVar p2MVar
+        let player2 = Player p2expr strokeColor2 fillColor2
+
         send context $ do
             displayPlayerMove player1
+            displayPlayerMove player2
+            let colors = map colorForPoint [ (didHit player1 coord, didHit player2 coord) | coord <- randCoords ]
+            sequence_ $ zipWith plotPoint colors randCoords
             drawGraphBorder
 
 
@@ -161,18 +171,18 @@ getCoords = do
 
 
 
-plotPoints :: [(Double,Double)] -> Canvas ()
-plotPoints pts = do
-    sequence_ $ fmap plotPoint pts
+plotPoints :: [(Double,Double)] -> Color -> Canvas ()
+plotPoints pts col = do
+    sequence_ $ fmap (plotPoint col) pts
 
 
-plotPoint :: (Double, Double) -> Canvas ()
-plotPoint (x,y) = do
+plotPoint :: Color -> (Double, Double) -> Canvas ()
+plotPoint col (x,y) = do
     beginPath()
     arc(x, y, 1, 0, 2*pi, False)
     lineWidth 5
-    strokeStyle "black"
-    fillStyle "black"
+    strokeStyle col
+    fillStyle col
     fill()
     stroke()
     closePath()
@@ -255,3 +265,22 @@ bounded (low, high) = (\val -> min high $ max low val)
 
 boundToGraph :: (Double -> Double)
 boundToGraph = bounded graphRange
+
+
+----------------------------------------------------------------
+
+didHit :: Player -> (Double, Double) -> Bool
+didHit (Player e _ _) (x,y) = compare' y playery where
+    compare' = case e of
+        GThan _ -> (>=)
+        LThan _ -> (<=)
+    fn = evalExpr e
+    playery = fn x
+
+
+colorForPoint :: (Bool, Bool) -> Color
+colorForPoint (False, False) = "black"
+colorForPoint (False, True ) = strokeColor2
+colorForPoint (True,  False) = strokeColor1
+colorForPoint (True,  True ) = strokeColor3
+
