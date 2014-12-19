@@ -11,10 +11,16 @@ as to try and cover as many points on the graph as possible.
 
 `runghc point-plotter.hs` to run, and `CTRL+C` to quit.
 
-### Example expressions:
+### example expressions:
 
 * `y <= [(2,3),(0.5,2)]` is like y <= 2x^3 + (0.5)x^2
 * `y >= [(-0.1,0)]` is like y >= (-0.1)
+
+### helpful tip:
+
+If you're using polynomials of degree > 1, make your
+coefficients small --- they are plotted on a 600x600 graph,
+so even x^2 goes off the charts fairly quickly.
 
 
 tested on an Ubuntu 14.04 virtualbox under Vagrant.
@@ -38,6 +44,7 @@ a rough to-do list
 - [x] Function to check status of MVar for user input
 - [x] Data types for simple-parse polynomial expressions
 - [x] Function to prompt for user equation
+- [ ] Display values of lines on plot
 - [ ] Break into server/client threads
 - [ ] Data type and parser for better representation of polynomials
 - [ ] ~~ Applicative/Monadic point, as in class example~~

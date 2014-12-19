@@ -32,6 +32,7 @@ main = do
             scale (1, -1)                                   -- invert y-scale so canvas
                                                             -- behaves like Cartesian plot
             drawGraphBackground
+            drawPlayerLegend
             plotPoints randCoords "black"
             drawGraphBorder
 
@@ -251,6 +252,23 @@ drawHorizontalLines = do
     stroke()
 
 drawGraphBackground = drawVerticalLines >> drawHorizontalLines
+
+
+drawPlayerLegend :: Canvas ()
+drawPlayerLegend = do
+    save()
+    scale(1,-1)
+
+    plotPoint strokeColor1 (350,-275)
+    plotPoint strokeColor2 (350,-250)
+    plotPoint strokeColor3 (350,-225)
+
+    font "10pt Consolas"
+    fillStyle "black"
+    fillText("Player 1", 360, -271)
+    fillText("Player 2", 360, -246)
+    fillText("Both players", 360, -221)
+    restore()
 
 
 ----------------------------------------------------------------
