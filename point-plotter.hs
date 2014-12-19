@@ -17,53 +17,15 @@ import Control.Concurrent
 import qualified Data.Map as Map
 import Graphics.Blank
 
--- Color values for strokes and fills
-strokeColor1 = "rgba(255,215,0,1)"
-fillColor1   = "rgba(255,215,0,0.1)"
-strokeColor2 = "rgba(32,178,70,1)"
-fillColor2   = "rgba(32,178,70,0.1)"
-strokeColor3 = "rgba(178,32,40,1)"
-fillColor3   = "rgba(178,32,40,0.1)"
 
-
--- Define a seed for generation of
--- pseudo-random (x,y) coordinates
-seed = 8::Int
-
--- Define how many points will be plotted on the graph
-numberOfPoints = 10::Int
-
--- Represent polynomials as tuples
--- of coefficients and exponents
-type PolyTerm = (Double, Int)
-
--- Expressions are <= or >= with
--- a polynomial
-data Expr = GThan [PolyTerm] | LThan [PolyTerm] deriving (Show, Eq, Ord)
-
-type Color = Text
-
--- Players associated with an expression and some colors
-data Player = Player Expr Color Color deriving (Show, Eq, Ord)
-
-
-
-
--- Prompt for expression input, print out if
--- successfully parsed
 main :: IO ()
 main = do
-    randCoords <- getCoords      -- random generation
-    let coords = getPureCoords  -- deterministic, with seed
+    randCoords <- getImpureCoords                           -- generate list of random coordinates
+    let pureCoords = getPureCoords                          -- list of pure pseudo-random coords generated using seed
 
     p1MVar <- newEmptyMVar
     p2MVar <- newEmptyMVar
 
-    -- Fork a thread for user to be able to input expr
-    forkIO (playerActionLoop "PLAYER 1" p1MVar)
-    --forkIO (playerActionLoop "PLAYER 2" p2MVar)
-
-    ------------------------------------------------------
     blankCanvas 3000 { middleware = [] } $ \ context -> do
         send context $ do
             translate (width context/2, height context/2)   -- center plot on screen
@@ -73,36 +35,46 @@ main = do
             plotPoints randCoords "black"
             drawGraphBorder
 
-        p1expr <- takeMVar p1MVar                       -- blocks until p1 has expr'd
-        let player1 = Player p1expr strokeColor1 fillColor1
 
-        forkIO (playerActionLoop "PLAYER 2" p2MVar)
+        forkIO (playerActionLoop "PLAYER 1" p1MVar)         -- prompt p1 for expr
+        p1expr <- takeMVar p1MVar                           -- blocks until p1 has expr'd
+        let p1 = Player p1expr strokeColor1 fillColor1
 
+
+        forkIO (playerActionLoop "PLAYER 2" p2MVar)         -- prompt for p2's expr
         p2expr <- takeMVar p2MVar
-        let player2 = Player p2expr strokeColor2 fillColor2
+        let p2 = Player p2expr strokeColor2 fillColor2
+
 
         send context $ do
-            displayPlayerMove player1
-            displayPlayerMove player2
-            let colors = map colorForPoint [ (didHit player1 coord, didHit player2 coord) | coord <- randCoords ]
-            sequence_ $ zipWith plotPoint colors randCoords
+            displayPlayerMove p1                            -- Display both player's exprs
+            displayPlayerMove p2
+            let colors = map colorForPoint [ (didHit p1 coord, didHit p2 coord) | coord <- randCoords ]
+            sequence_ $ zipWith plotPoint colors randCoords -- redraw color-coded points
             drawGraphBorder
 
 
+
+----------------------------------------------------------------
+-- PLAYER INPUT
+----------------------------------------------------------------
+
+-- Prompt player to enter an expression.
 playerActionLoop :: String -> MVar Expr -> IO ()
 playerActionLoop name var = do
     putStrLn $ name ++ " ------------------------------------------------"
     input <- promptForExpr
     case parseExpr input of
         Just expr -> do
-            putStrLn "Successful parse"
             putMVar var expr
         Nothing -> do
-            putStrLn "Unsuccessful parse\n"
+            putStrLn    ("Could not parse your input.\n" ++
+                        "ex: \"y <= [(0.0002,3),(2,1)]\"")
             playerActionLoop name var
 
 
 -- From HaskellWiki: Intro to Haskell IO Actions
+-- https://www.haskell.org/haskellwiki/Introduction_to_Haskell_IO/Actions
 promptLine :: String -> IO String
 promptLine prompt = putStr prompt >> hFlush stdout >> getLine
 
@@ -112,7 +84,8 @@ promptForExpr =
     promptLine "Enter comparison operator and [(Coefficient, Exponent)] values\ny "
 
 
--- Easy parsing of expression
+-- Parse user's input. Fairly brittle,
+-- expects "<= [PolyTerm]" input
 parseExpr :: String -> Maybe Expr
 parseExpr (a:b:terms) = case readTermsMaybe terms of
     Just (t:ts) -> if (a:b:[]) == "<=" 
@@ -126,55 +99,43 @@ readTermsMaybe :: String -> Maybe [PolyTerm]
 readTermsMaybe str = readMaybe str
 
 
+----------------------------------------------------------------
+-- COORDINATE GENERATION
+----------------------------------------------------------------
 
--- Define the range of points
--- viewable in the graph plot
-graphRange :: (Double, Double)
-graphRange = (-300, 300)
-
-
+-- Get list of values from seeded generator
 getPureRandoms :: StdGen -> [Double]
 getPureRandoms gen =
     take numberOfPoints $ randomRs graphRange gen
 
 getPureCoords =
-    let g           = mkStdGen seed
-        (ga, gb)    = split g
+    let g           = mkStdGen seed                     -- use defined seed to create a generator
+        (ga, gb)    = split g                           -- create 2nd generator
         xs          = getPureRandoms ga
         ys          = getPureRandoms gb
     in zip xs ys
 
 
-
-
-
-{- ##############################
- - RANDOM, IMPURE IO COORDINATES
- ############################## -}
-
--- Get a single random int within range
+-- Get random int (within range) using system's standard generator
 getRandomInRange :: IO Double
 getRandomInRange = getStdRandom $ randomR graphRange
 
--- Zip lists of random Ints to make random coordinates
-getCoords :: IO [(Double, Double)]
-getCoords = do
-    -- replicateM :: Monad m => Int -> m a -> m [a]
-    -- repeats a monadic action n times, creates list
+
+getImpureCoords :: IO [(Double, Double)]
+getImpureCoords = do
+    -- replicateM repeats a monadic action n times
     xs <- replicateM numberOfPoints getRandomInRange    -- xs::[Double]
     ys <- replicateM numberOfPoints getRandomInRange    -- ys::[Double]
     return $ zip xs ys
 
-{- ######################### -}
 
-
-
-
+----------------------------------------------------------------
+-- DISPLAY PLAYER ACTIONS
+----------------------------------------------------------------
 
 plotPoints :: [(Double,Double)] -> Color -> Canvas ()
 plotPoints pts col = do
     sequence_ $ fmap (plotPoint col) pts
-
 
 plotPoint :: Color -> (Double, Double) -> Canvas ()
 plotPoint col (x,y) = do
@@ -188,6 +149,77 @@ plotPoint col (x,y) = do
     closePath()
 
 
+-- Plots player's move input and fills in plot,
+-- depending on whether the given expression is
+-- (y <= ...) or (y >= ...)
+displayPlayerMove :: Player -> Canvas ()
+displayPlayerMove (Player expr sc fc) = do
+    let fn = evalExpr expr                      -- generate (dbl -> dbl) function
+    beginPath()
+    plotExpr fn                                 -- plot function line
+    case expr of
+        GThan terms -> do lineTo (300,300)      -- fill above the line
+                          lineTo (-300,300)
+                          fillStyle fc
+                          fill()
+        LThan terms -> do lineTo (300,-300)     -- fill below the line
+                          lineTo (-300,-300)
+                          fillStyle fc
+                          fill()
+    lineWidth 4
+    strokeStyle sc
+    stroke()
+    closePath()
+
+
+
+-- Create a function from x -> y
+-- From a list of PolyTerms
+evalExpr :: Expr -> (Double -> Double)
+evalExpr (LThan terms) = evalExpr (GThan terms)
+evalExpr (GThan terms) =
+    (\x -> sum $ map (\f -> f x) evalTerms)
+        where evalTerms = [ (\x -> c*(x^e)) | (c,e) <- terms ]  -- c=coeff, e=expo
+
+-- Plot line of player's expression
+plotExpr :: (Double -> Double) -> Canvas ()
+plotExpr f = do
+    let range = [(fst graphRange)..(snd graphRange)]
+    let coords = [ (x, (boundToGraph $ f x)) | x <- range ]
+    moveTo (coords !! 0)
+    sequence_ $ map lineTo coords
+
+
+-- Keep y-values within range of graph
+boundToGraph :: (Double -> Double)
+boundToGraph = bounded graphRange
+
+bounded :: (Double, Double) -> (Double -> Double)
+bounded (low, high) = (\val -> min high $ max low val)
+
+
+-- Determine if a coordinate is within the
+-- filled area of a player's expression
+didHit :: Player -> (Double, Double) -> Bool
+didHit (Player e _ _) (x,y) = compare' y playery where
+    compare' = case e of
+        GThan _ -> (>=)
+        LThan _ -> (<=)
+    fn = evalExpr e
+    playery = fn x
+
+
+colorForPoint :: (Bool, Bool) -> Color
+colorForPoint (False, False) = "black"
+colorForPoint (False, True ) = strokeColor2     -- only player2 hit
+colorForPoint (True,  False) = strokeColor1     -- only player1 hit
+colorForPoint (True,  True ) = strokeColor3     -- both players hit,
+                                                -- display a 3rd color
+
+
+----------------------------------------------------------------
+-- DRAWING BACKGROUND
+----------------------------------------------------------------
 
 drawGraphBorder :: Canvas ()
 drawGraphBorder = do
@@ -221,66 +253,44 @@ drawHorizontalLines = do
 drawGraphBackground = drawVerticalLines >> drawHorizontalLines
 
 
+----------------------------------------------------------------
+-- TYPES
+----------------------------------------------------------------
+type Color = Text
 
+-- Represent polynomials as tuples
+-- of coefficients and exponents
+type PolyTerm = (Double, Int)
 
+-- Expressions are <= or >= with a polynomial
+data Expr = GThan [PolyTerm] | LThan [PolyTerm] deriving (Show, Eq, Ord)
 
--- Create a function from x -> y
-evalExpr :: Expr -> (Double -> Double)
-evalExpr (GThan terms) =
-    (\x -> sum $ map (\f -> f x) evalTerms)
-        where evalTerms = [ (\x -> c*(x^e)) | (c,e) <- terms ]  -- c=coeff, e=expo
-evalExpr (LThan terms) = evalExpr (GThan terms)
-
-plotExpr :: (Double -> Double) -> Canvas ()
-plotExpr f = do
-    let range = [(fst graphRange)..(snd graphRange)]
-    let coords = [ (x, (boundToGraph $ f x)) | x <- range ]
-    moveTo (coords !! 0)
-    sequence_ $ map lineTo coords
-
-
-displayPlayerMove :: Player -> Canvas ()
-displayPlayerMove (Player expr sc fc) = do
-    let fn = evalExpr expr
-    beginPath()
-    plotExpr fn -- plot actual function
-    case expr of
-        GThan terms -> do lineTo (300,300)
-                          lineTo (-300,300)
-                          fillStyle fc
-                          fill()
-        LThan terms -> do lineTo (300,-300)
-                          lineTo (-300,-300)
-                          fillStyle fc
-                          fill()
-    lineWidth 4
-    strokeStyle sc
-    stroke()
-    closePath()
-
-
-
-bounded :: (Double, Double) -> (Double -> Double)
-bounded (low, high) = (\val -> min high $ max low val)
-
-boundToGraph :: (Double -> Double)
-boundToGraph = bounded graphRange
-
+-- Players associated with an expression and some colors
+data Player = Player Expr Color Color deriving (Show, Eq, Ord)
 
 ----------------------------------------------------------------
+-- SOME SETTINGS
+----------------------------------------------------------------
 
-didHit :: Player -> (Double, Double) -> Bool
-didHit (Player e _ _) (x,y) = compare' y playery where
-    compare' = case e of
-        GThan _ -> (>=)
-        LThan _ -> (<=)
-    fn = evalExpr e
-    playery = fn x
+-- Set point generation mode.
+-- False will generate coords with seed below
+useRandomCoords = True
 
+-- Define a seed for generation of
+-- pseudo-random (x,y) coordinates
+seed = 8::Int
 
-colorForPoint :: (Bool, Bool) -> Color
-colorForPoint (False, False) = "black"
-colorForPoint (False, True ) = strokeColor2
-colorForPoint (True,  False) = strokeColor1
-colorForPoint (True,  True ) = strokeColor3
+-- Color values for strokes and fills
+strokeColor1 = "rgba(255,215,0,1)"
+fillColor1   = "rgba(255,215,0,0.1)"
+strokeColor2 = "rgba(32,178,70,1)"
+fillColor2   = "rgba(32,178,70,0.1)"
+strokeColor3 = "rgba(178,32,40,1)"
+fillColor3   = "rgba(178,32,40,0.1)"
+
+-- Define how many points will be plotted on the graph
+numberOfPoints = 15::Int
+
+-- Define the range of points in graph plot
+graphRange = (-300, 300)::(Double,Double)
 
