@@ -33,26 +33,19 @@ seed = 8::Int
 -- Define how many points will be plotted on the graph
 numberOfPoints = 10::Int
 
-
 -- Represent polynomials as tuples
 -- of coefficients and exponents
 type PolyTerm = (Double, Int)
 
 -- Expressions are <= or >= with
 -- a polynomial
-data Expr = GThan [PolyTerm] | LThan [PolyTerm] deriving Show
+data Expr = GThan [PolyTerm] | LThan [PolyTerm] deriving (Show, Eq, Ord)
 
 type Color = Text
 
--- Players can be represented by colors!
-data Player = Player1 Color Color | Player2 Color Color deriving (Show, Eq, Ord)
+-- Players associated with an expression and some colors
+data Player = Player Expr Color Color deriving (Show, Eq, Ord)
 
-player1,player2 :: Player
-player1 = Player1 strokeColor1 fillColor1
-player2 = Player2 strokeColor2 fillColor2
-
-exprMap :: Map.Map Player Expr
-exprMap = Map.empty
 
 
 
@@ -79,10 +72,10 @@ main = do
             drawGraphBorder
 
         p1expr <- takeMVar p1MVar                       -- blocks until p1 has expr'd
+        let player1 = Player p1expr strokeColor1 fillColor1
 
         send context $ do
-            --fillExpr player1
-            displayPlayerMove player1 p1expr
+            displayPlayerMove player1
             drawGraphBorder
 
 
@@ -236,12 +229,8 @@ plotExpr f = do
     sequence_ $ map lineTo coords
 
 
-displayPlayerMove :: Player -> Expr -> Canvas ()
-displayPlayerMove (Player1 sc fc) e = fillExpr e sc fc
-displayPlayerMove (Player2 sc fc) e = fillExpr e sc fc
-
-fillExpr :: Expr -> Color -> Color -> Canvas ()
-fillExpr expr sc fc = do
+displayPlayerMove :: Player -> Canvas ()
+displayPlayerMove (Player expr sc fc) = do
     let fn = evalExpr expr
     beginPath()
     plotExpr fn -- plot actual function
